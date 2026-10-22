@@ -456,11 +456,6 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                     Ok(s) => (s.width as f64 / scale, s.height as f64 / scale),
                     Err(_) => (PANEL_W, PANEL_H),
                 };
-                if (x - last.0).abs() < 1.0 && (y - last.1).abs() < 1.0 {
-                    continue;
-                }
-                last = (x, y);
-
                 // Click-through: the window only takes the mouse over the island
                 // shape. A small entry margin means the flag is already off by the
                 // time a moving cursor reaches a button.
@@ -471,6 +466,17 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                     && y >= r.y - HIT_MARGIN
                     && y <= r.y + r.h + HIT_MARGIN;
 
+                // Read before the "cursor did not move" shortcut: a click is a
+                // press without a move.
+                let down = left_button_down();
+                let pressed = down && !was_down;
+                was_down = down;
+                // A press anywhere but on the island folds it when it is open,
+                // like Escape (the page decides; it ignores this otherwise).
+                if pressed && !on_island {
+                    let _ = win.emit("outside-press", ());
+                }
+
                 // A file being dragged has to be able to find us. WS_EX_TRANSPARENT
                 // — what click-through is on Windows — hides the window from
                 // WindowFromPoint, so OLE finds no drop target and shows the "no
@@ -480,12 +486,15 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                 // the mouse, which also makes the drop zone as forgiving as the Mac's.
                 // A press may be the start of a drag: make sure the drop target is
                 // ours before the file arrives.
-                let down = left_button_down();
-                if down && !was_down {
+                if pressed {
                     let handle = app.clone();
                     let _ = app.run_on_main_thread(move || platform::unblock_webview_drops(&handle));
                 }
-                was_down = down;
+
+                if (x - last.0).abs() < 1.0 && (y - last.1).abs() < 1.0 && !pressed {
+                    continue;
+                }
+                last = (x, y);
 
                 let dragging = down
                     && x >= 0.0

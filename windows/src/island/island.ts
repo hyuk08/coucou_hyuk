@@ -436,6 +436,16 @@ export class Island {
     this.fsm.forcePetit();
   }
 
+  /**
+   * The mouse was pressed somewhere else on the screen: the open island folds
+   * as with Escape — a waiting card is folded away, never answered.
+   */
+  foldFromOutside() {
+    if (State.mode !== "expanded" || this.desktop.carrying) return;
+    if (State.pendingApproval) this.foldApproval();
+    else if (!State.isPinned) this.collapse();
+  }
+
   /** Alert from the hook server: open on this view. Pinned alerts never auto-close. */
   alert(view: IslandViewName) {
     this.fsm.pinned = State.isPinned;
