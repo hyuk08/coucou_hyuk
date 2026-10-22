@@ -338,6 +338,12 @@ export const Bridge = {
   chatSend: (query: string, context: ChatContext | null) =>
     callOrThrow<{ text: string }>("chat_send", { query, context }),
   chatReset: () => call<void>("chat_reset"),
+  /** Types the text (and the images' paths) into the session's terminal, then Enter. */
+  sendToSession: (sessionId: string, text: string, images: string[]) =>
+    callOrThrow<void>("send_to_session", { sessionId, text, images }),
+  /** A pasted image as a path: the screenshot Windows just saved, else a copy in the inbox. */
+  pasteImage: (bytes: number[], width: number, height: number) =>
+    callOrThrow<string>("paste_image", { bytes, width, height }),
   /**
    * The models a provider offers, for the picker in the chat view. Rust asks
    * the provider only when it has a key (or a server address).

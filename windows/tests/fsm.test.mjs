@@ -377,3 +377,27 @@ test("open on hover: an island opened by an alert keeps the normal delay", () =>
   seconds(2);
   assert.equal(fsm.state, "petit");
 });
+
+test("Always show the island: the compact island never hides on its own", () => {
+  fsm.keepVisible = true;
+  fsm.reveal();
+  seconds(600);
+  assert.equal(fsm.state, "petit");
+  // Turned off: the usual minute starts again.
+  fsm.keepVisible = false;
+  seconds(60);
+  assert.equal(fsm.state, "hidden");
+});
+
+test("an island held open while someone types does not fold, then folds as usual", () => {
+  fsm.forceHome();
+  fsm.mouseLeft();
+  assert.equal(fsm.hold(true), false);
+  seconds(120);
+  assert.equal(fsm.state, "home");
+  // Released: the caller restarts the countdown (the pointer is away).
+  assert.equal(fsm.hold(false), true);
+  fsm.mouseLeft();
+  seconds(15);
+  assert.equal(fsm.state, "petit");
+});

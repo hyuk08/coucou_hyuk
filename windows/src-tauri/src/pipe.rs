@@ -259,7 +259,11 @@ fn note_session_window(pipe: &impl Relay, payload: &Value, event: &str) {
     let Some(session) = payload.get("session_id").and_then(Value::as_str) else { return };
     if event == "SessionEnd" {
         session_window::forget(session);
+        crate::session_input::forget(session);
         return;
+    }
+    if let Some(relay) = pipe.client_pid() {
+        crate::session_input::note(session, relay);
     }
     if session_window::known(session) {
         return;

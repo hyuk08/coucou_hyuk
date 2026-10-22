@@ -165,6 +165,10 @@ export class Island {
       cancelDrop: () => this.discardDrop(),
       collapse: () => this.collapse(),
       foldApproval: () => this.foldApproval(),
+      holdOpen: (on) => {
+        // Released with the pointer away: the usual fold countdown starts.
+        if (this.fsm.hold(on) && !this.wasInIsland) this.fsm.mouseLeft();
+      },
       setFocus: (id) => {
         State.setFocus(id);
         Sound.play("blip");
@@ -1185,11 +1189,13 @@ export class Island {
     // The chat is the only view with a text field, so it is the only time the
     // island is allowed to take keyboard focus.
     if (this.lastSyncedView !== State.view) {
-      const wasChat = this.lastSyncedView === "prompt";
+      const typing = (v: string | null) => v === "prompt" || v === "send";
+      const wasChat = typing(this.lastSyncedView);
       this.lastSyncedView = State.view;
-      if (State.view === "prompt") {
+      if (typing(State.view)) {
         void Bridge.focusWindow(true);
-        window.setTimeout(() => this.views.get("prompt")?.focus?.(), 120);
+        const view = State.view;
+        window.setTimeout(() => this.views.get(view)?.focus?.(), 120);
       } else if (wasChat) {
         void Bridge.focusWindow(false);
       }

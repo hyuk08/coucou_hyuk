@@ -16,8 +16,9 @@ EventTarget.prototype.addEventListener = function (
   add.call(this, type, listener, options);
 };
 
+// Messages and the text field's bar count as content, not as empty space.
 const CONTROLS =
-  "button, a, input, textarea, select, label, summary, img, canvas, [contenteditable], [role=button], [tabindex]";
+  "button, a, input, textarea, select, label, summary, img, canvas, [contenteditable], [role=button], [tabindex], .bubble, .reply, .chat-bar";
 
 /** True when nothing between the clicked element and `container` (excluded) reacts to a press. */
 export function isEmptySpot(e: MouseEvent, container: Element): boolean {

@@ -17,6 +17,7 @@ export type IslandViewName =
   | "choose"
   | "mail"
   | "prompt"
+  | "send"
   | "searching"
   | "result"
   | "note"
@@ -84,6 +85,8 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   choose: { height: 176, botX: 60, botY: 101, botDiameter: 52, agentMode: "column" },
   mail: { height: 240, botX: 56, botY: null, botDiameter: 46, agentMode: "column" },
   prompt: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "column" },
+  // Send to Claude Code: the session's conversation, then the field (views/send.ts).
+  send: { height: 300, botX: 52, botY: null, botDiameter: 44, agentMode: "column" },
   searching: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "column" },
   result: { height: 160, botX: 52, botY: null, botDiameter: 44, agentMode: "column" },
   note: { height: 160, botX: 60, botY: null, botDiameter: 50, agentMode: "column" },

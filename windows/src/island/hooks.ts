@@ -8,6 +8,7 @@
 import { Bridge, onEvent } from "../core/bridge";
 import { buildFileDiff, fileName, makeDiffStep, toOneLine } from "../core/diff";
 import { Sound } from "../core/sound";
+import { answersHere, observeSessionHook } from "../views/send";
 import { State, type AskedQuestion } from "../core/state";
 import { pillDefinition } from "../core/pills";
 import { APPROVAL_AGENTS, agentColor, agentName, validateAgent } from "./agents";
@@ -240,7 +241,11 @@ function recordDiff(agentId: string, payload: HookPayload) {
 export function registerHookHandlers(island: Island) {
   // The last plan numbers seen survive a restart, as on the Mac.
   State.planUsage ??= restorePlanUsage(storedClaudePlanUsage());
-  void onEvent<HookPayload>("hook", (payload) => handleHook(island, payload));
+  void onEvent<HookPayload>("hook", (payload) => {
+    handleHook(island, payload);
+    // After: a Stop is routed (answersHere) before the send view takes it in.
+    observeSessionHook(payload);
+  });
 }
 
 function handleHook(island: Island, payload: HookPayload) {
@@ -419,8 +424,12 @@ function handleHook(island: Island, payload: HookPayload) {
         if (t) t.finalLine = finalText;
       }
       Sound.play("finish");
-      // A card waiting for an answer is never covered by another alert.
-      if (focused && !State.pendingApproval) surface("finished", true);
+      // A card waiting for an answer is never covered by another alert. An
+      // answer to a message sent from the island is read there, in full.
+      if (answersHere(payload.session_id) && !State.pendingApproval) {
+        if (State.mode !== "expanded") island.alert("send");
+        else if (State.view !== "send") island.setView("send");
+      } else if (focused && !State.pendingApproval) surface("finished", true);
       else State.setPillBadge(agentId, "finished");
       cancelStopTimer(agentId);
       stopTimers.set(

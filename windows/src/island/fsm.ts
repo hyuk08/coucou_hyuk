@@ -47,6 +47,17 @@ export class IslandStateMachine {
     if (on) this.clear("petitHide");
     else if (this.state === "petit") this.schedulePetitHide();
   }
+  /**
+   * Someone is typing in the island (Send to Claude Code): the open island does
+   * not fold on its own meanwhile. Returns whether a fold countdown should start
+   * again now that it is released.
+   */
+  hold(on: boolean): boolean {
+    if (on === this.held) return false;
+    this.held = on;
+    if (on) this.clear("homeCollapse");
+    return !on && this.state === "home";
+  }
   /** Grace period after the pointer leaves a hover-opened island, seconds. */
   hoverCloseDelay = 0.6;
   /** Open because of a hover, until the user clicks inside it. */
@@ -64,6 +75,7 @@ export class IslandStateMachine {
   private homeDelay = 15;
   private byHover = false;
   private keep = false;
+  private held = false;
   private petitHide: number | null = null;
   private homeCollapse: number | null = null;
   private greetCollapse: number | null = null;
@@ -183,7 +195,7 @@ export class IslandStateMachine {
 
   private scheduleHomeCollapse() {
     this.clear("homeCollapse");
-    if (this.pinned) return;
+    if (this.pinned || this.held) return;
     const ms = (this.byHover ? this.hoverCloseDelay : this.homeDelay) * 1000;
     this.homeCollapseDueAt = performance.now() + ms;
     this.homeCollapse = window.setTimeout(() => {

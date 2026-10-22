@@ -47,6 +47,11 @@ pub fn config_dir() -> PathBuf {
 /// ~/.local/share/coucou — where coucou-hook, the inbox and the log live. The
 /// relay has to sit at a stable path: an AppImage is mounted somewhere new on
 /// every launch.
+/// Screenshots are matched on Windows only.
+pub fn screenshots_dir() -> Option<PathBuf> {
+    None
+}
+
 pub fn local_dir() -> PathBuf {
     xdg("XDG_DATA_HOME", ".local/share").join("coucou")
 }

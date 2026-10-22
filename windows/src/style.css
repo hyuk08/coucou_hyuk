@@ -2672,3 +2672,84 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
   unicode-bidi: plaintext;
   text-align: start;
 }
+
+/* ── Send to Claude Code (views/send.ts) ────────────────────────────────── */
+
+.send-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.send-target {
+  flex: 0 0 auto;
+  max-width: 220px;
+  border-color: rgba(255, 255, 255, 0);
+  transform: none;
+  cursor: default;
+}
+
+.send-target span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.send-target .chip-dot {
+  background: #d97757;
+}
+
+.send-target.many:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.send-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: 400 11px var(--font);
+  color: var(--dim-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.send-thumbs {
+  display: flex;
+  gap: 6px;
+}
+
+.send-thumbs:empty {
+  display: none;
+}
+
+.send-thumb {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.send-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.send-thumb-x {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: default;
+}

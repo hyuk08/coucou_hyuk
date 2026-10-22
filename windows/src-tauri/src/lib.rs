@@ -27,6 +27,7 @@ mod platform;
 mod portal;
 mod recap;
 mod secrets;
+mod session_input;
 mod session_window;
 mod settings;
 mod shortcuts;
@@ -332,6 +333,32 @@ fn open_session(session_id: Option<String>, path: Option<String>) -> bool {
         });
         true
     }
+}
+
+/// "Send to Claude Code": the island's text, typed into the session's terminal
+/// and sent (session_input.rs). Off the main thread: it waits before Enter.
+#[tauri::command]
+async fn send_to_session(session_id: String, text: String, images: Vec<String>) -> Result<(), String> {
+    let images: Vec<String> = images.into_iter().filter(|p| std::path::Path::new(p).is_file()).collect();
+    tauri::async_runtime::spawn_blocking(move || session_input::send(&session_id, &text, &images))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// An image pasted in the island, as a path Claude Code can open: the
+/// screenshot Windows just saved when it is that one, else a copy in the inbox.
+#[tauri::command]
+async fn paste_image(bytes: Vec<u8>, width: u32, height: u32) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if let Some(dir) = platform::screenshots_dir() {
+            if let Some(path) = session_input::recent_screenshot(&dir, width, height) {
+                return Ok(path.to_string_lossy().into_owned());
+            }
+        }
+        session_input::save_image(&files::inbox_dir(), &bytes).map(|p| p.to_string_lossy().into_owned())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// The Claude Desktop pill's target: the Claude app (Windows only — it has no
@@ -810,6 +837,8 @@ pub fn run() {
             set_collapsed,
             set_island_rect,
             focus_window,
+            send_to_session,
+            paste_image,
             reposition,
             fit_zoom,
             hub_shown,
