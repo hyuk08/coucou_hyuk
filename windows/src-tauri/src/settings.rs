@@ -99,6 +99,8 @@ pub struct Settings {
     pub phone_relay_url: String,
     /// The date and time in the middle of the compact island. Off by default.
     pub show_clock: bool,
+    /// The compact island stays on screen instead of hiding when nothing runs. Off by default.
+    pub keep_visible: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -165,6 +167,7 @@ impl Default for Settings {
             phone_relay: false,
             phone_relay_url: String::new(),
             show_clock: false,
+            keep_visible: false,
         }
     }
 }
@@ -452,7 +455,8 @@ mod tests {
   "phoneServices": ["integration_stripe"],
   "phoneRelay": true,
   "phoneRelayUrl": "wss://relay.example.workers.dev",
-  "showClock": true
+  "showClock": true,
+  "keepVisible": true
 }"##;
 
     fn custom() -> Value {
@@ -961,6 +965,7 @@ mod tests {
                 "phoneRelay",
                 "phoneRelayUrl",
                 "showClock",
+                "keepVisible",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);

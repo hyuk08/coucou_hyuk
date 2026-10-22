@@ -2,6 +2,7 @@
 // Mirrors IslandRootView.swift + IslandWindowController.swift.
 
 import { Tracked, Spring, clamp } from "../core/anim";
+import { isEmptySpot } from "./empty-spot";
 import { Bridge, IS_TAURI, onDragDrop } from "../core/bridge";
 import {
   EXPANDED_CORNER, EXPANDED_W, NOTCH_W, PANEL_H, PANEL_W,
@@ -107,6 +108,7 @@ export class Island {
 
   /** Where a press on Mochi started: moving past DRAG_THRESHOLD drags him out. */
   private botPress: { x: number; y: number } | null = null;
+  private pressOnOpen = false;
 
   /** The next reveal from hidden makes no peek (music starting, as on macOS). */
   private silentReveal = false;
@@ -315,6 +317,7 @@ export class Island {
   private wireFsm() {
     this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
     this.fsm.openOnHover = State.settings.openOnHover;
+    this.fsm.keepVisible = State.settings.keepVisible;
     this.fsm.onTransition = (from, to) => {
       // The greeting is over, however it ended: back to his desktop spot.
       if (from === "coucou" && to !== "coucou") this.desktop.launch();
@@ -739,6 +742,9 @@ export class Island {
     this.islandEl.addEventListener("mousedown", (e) => {
       Sound.resume();
       State.lastActivity = performance.now();
+      // Only a press on an island that was already open may fold it again:
+      // the click that opens it must not close it on the way up.
+      this.pressOnOpen = e.button === 0 && State.mode === "expanded" && !this.isBotHit(e.clientX, e.clientY);
       // A click makes a hover-opened island an ordinary open one.
       this.fsm.userInteracted();
       // A press on Mochi may become a drag out to the desktop.
@@ -759,6 +765,15 @@ export class Island {
         this.cancelBotHover();
         this.engine.slap();
       }
+    });
+
+    // A click on an empty spot of the open island folds it, like Escape.
+    this.islandEl.addEventListener("click", (e) => {
+      const onOpen = this.pressOnOpen;
+      this.pressOnOpen = false;
+      if (!onOpen || State.mode !== "expanded" || !isEmptySpot(e, this.islandEl)) return;
+      if (State.pendingApproval) this.foldApproval();
+      else if (!State.isPinned) this.collapse();
     });
 
     // No browser menu over Mochi: his right-click is the wardrobe. Everywhere
@@ -1220,6 +1235,8 @@ export class Island {
     Sound.setVolume(State.settings.soundVolume);
     this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
     this.fsm.openOnHover = State.settings.openOnHover;
+    this.fsm.keepVisible = State.settings.keepVisible;
+    if (State.settings.keepVisible && !State.paused && State.mode === "hidden") this.revealSilently();
     State.notify();
     // ponytail: one timer for the life of the window; a minute is the clock's finest tick.
     this.clockTimer ??= window.setInterval(() => this.updateClock(), 10_000);

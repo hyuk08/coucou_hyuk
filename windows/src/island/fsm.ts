@@ -34,6 +34,19 @@ export class IslandStateMachine {
    * General → Open on hover, off by default), as IslandStateMachine.openOnHover.
    */
   openOnHover = false;
+  /**
+   * The compact island never hides on its own (Settings → General → Always
+   * show the island). Turning it off starts the usual countdown again.
+   */
+  get keepVisible(): boolean {
+    return this.keep;
+  }
+  set keepVisible(on: boolean) {
+    if (on === this.keep) return;
+    this.keep = on;
+    if (on) this.clear("petitHide");
+    else if (this.state === "petit") this.schedulePetitHide();
+  }
   /** Grace period after the pointer leaves a hover-opened island, seconds. */
   hoverCloseDelay = 0.6;
   /** Open because of a hover, until the user clicks inside it. */
@@ -50,6 +63,7 @@ export class IslandStateMachine {
 
   private homeDelay = 15;
   private byHover = false;
+  private keep = false;
   private petitHide: number | null = null;
   private homeCollapse: number | null = null;
   private greetCollapse: number | null = null;
@@ -160,7 +174,7 @@ export class IslandStateMachine {
     this.clear("petitHide");
     // A card folded away while it waits for an answer keeps the compact island
     // on screen, so it can be reopened (isHeldOpen on macOS).
-    if (this.pinned) return;
+    if (this.pinned || this.keep) return;
     this.petitHide = window.setTimeout(() => {
       this.petitHide = null;
       if (this.state === "petit" && !this.pinned) this.transition("hidden");

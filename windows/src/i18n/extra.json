@@ -4870,6 +4870,32 @@
    "de": "Coucou konnte nicht antworten: Prüfe deinen Claude-Schlüssel unter Notch → Chat.",
    "tr": "Coucou yanıt veremedi: Çentik → Sohbet bölümündeki Claude anahtarını kontrol et."
   },
+  "Always show the island": {
+   "zh-Hans": "始终显示灵动岛",
+   "hi": "आइलैंड हमेशा दिखाएँ",
+   "es": "Mostrar siempre la isla",
+   "ar": "إظهار الجزيرة دائمًا",
+   "fr": "Toujours afficher l'îlot",
+   "bn": "আইল্যান্ড সবসময় দেখান",
+   "pt-BR": "Sempre mostrar a ilha",
+   "ru": "Всегда показывать остров",
+   "id": "Selalu tampilkan pulau",
+   "de": "Insel immer anzeigen",
+   "tr": "Adayı her zaman göster"
+  },
+  "The compact island stays at the top of the screen even when nothing is running.": {
+   "zh-Hans": "即使没有任务运行，收起的岛也会留在屏幕顶部。",
+   "hi": "कुछ न चलने पर भी छोटा आइलैंड स्क्रीन के ऊपर बना रहता है।",
+   "es": "La isla compacta se queda arriba de la pantalla aunque no haya nada en marcha.",
+   "ar": "تبقى الجزيرة المصغّرة أعلى الشاشة حتى عندما لا يعمل أي شيء.",
+   "fr": "L'îlot compact reste en haut de l'écran même quand rien ne tourne.",
+   "bn": "কিছু না চললেও ছোট আইল্যান্ড স্ক্রিনের ওপরে থাকে।",
+   "pt-BR": "A ilha compacta fica no topo da tela mesmo quando nada está em execução.",
+   "ru": "Компактный остров остаётся вверху экрана, даже когда ничего не запущено.",
+   "id": "Pulau ringkas tetap di atas layar meski tidak ada yang berjalan.",
+   "de": "Die kompakte Insel bleibt oben am Bildschirm, auch wenn nichts läuft.",
+   "tr": "Hiçbir şey çalışmadığında bile kompakt ada ekranın üstünde kalır."
+  },
   "Show clock in the island": {
    "zh-Hans": "在灵动岛中显示时钟",
    "hi": "आइलैंड में घड़ी दिखाएँ",
