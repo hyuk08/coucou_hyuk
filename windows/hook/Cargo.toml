@@ -20,6 +20,8 @@ windows = { version = "0.61", features = [
   "Win32_Security_Authorization",
   "Win32_System_Pipes",
   "Win32_System_Threading",
+  # The Claude Code process above us, for "Send to Claude Code" (claude_process).
+  "Win32_System_Diagnostics_ToolHelp",
 ] }
 
 # The socket syscalls and peer credentials the Linux transport needs.

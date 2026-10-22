@@ -83,7 +83,9 @@ export function observeSessionHook(p: SessionHook) {
     }
   }
   s.seen = Date.now();
-  if (p.hook_event_name === "UserPromptSubmit" && p.prompt) {
+  // Background-task notices and the like reach Claude Code as prompts too:
+  // what the person wrote is what is shown.
+  if (p.hook_event_name === "UserPromptSubmit" && p.prompt && !/^\s*<[a-z-]+[\s>]/.test(p.prompt)) {
     s.turns.push({ role: "user", text: p.prompt });
   } else if (p.hook_event_name === "Stop") {
     if (p.last_assistant_message) s.turns.push({ role: "assistant", text: p.last_assistant_message });

@@ -5000,6 +5000,19 @@
    "de": "Sitzung wechseln",
    "tr": "Oturumu değiştir"
   },
+  "Talk to Claude Code": {
+   "zh-Hans": "与 Claude Code 对话",
+   "hi": "Claude Code से बात करें",
+   "es": "Hablar con Claude Code",
+   "ar": "تحدّث إلى Claude Code",
+   "fr": "Parler à Claude Code",
+   "bn": "Claude Code-এর সঙ্গে কথা বলুন",
+   "pt-BR": "Falar com o Claude Code",
+   "ru": "Написать Claude Code",
+   "id": "Bicara dengan Claude Code",
+   "de": "Mit Claude Code sprechen",
+   "tr": "Claude Code ile konuş"
+  },
   "Show clock in the island": {
    "zh-Hans": "在灵动岛中显示时钟",
    "hi": "आइलैंड में घड़ी दिखाएँ",

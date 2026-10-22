@@ -39,8 +39,9 @@ fn valid_session(id: &str) -> bool {
 }
 
 /// A hook from `session` came through the relay `relay_pid`: find its Claude
-/// Code process once.
-pub fn note(session: &str, relay_pid: u32) {
+/// Code process once. The relay names it (`claimed`), as it has usually exited
+/// by now; its own process tree is the fallback, for an older relay.
+pub fn note(session: &str, relay_pid: u32, claimed: Option<u32>) {
     if !valid_session(session) {
         return;
     }
@@ -50,11 +51,16 @@ pub fn note(session: &str, relay_pid: u32) {
             return;
         }
     }
-    let target = find_target(relay_pid);
+    let target = claimed.and_then(claimed_target).or_else(|| find_target(relay_pid));
     // No ancestors at all: the relay was already gone, so try again next time.
     #[cfg(windows)]
     if target.is_none() && crate::platform::process_ancestors(relay_pid).is_empty() {
         return;
+    }
+    let short: String = session.chars().take(8).collect();
+    match target {
+        Some(t) => crate::log::line(format!("send: session {short} types into process {}", t.pid)),
+        None => crate::log::line(format!("send: session {short} has no Claude Code console among {}", chain(relay_pid))),
     }
     let mut list = SESSIONS.lock().unwrap_or_else(|e| e.into_inner());
     list.retain(|(s, _)| s != session);
@@ -78,6 +84,36 @@ fn find_target(relay_pid: u32) -> Option<Target> {
 #[cfg(not(windows))]
 fn find_target(_relay_pid: u32) -> Option<Target> {
     None
+}
+
+/// The process the relay named, if it really is Claude Code and still running.
+#[cfg(windows)]
+fn claimed_target(pid: u32) -> Option<Target> {
+    let (exe, started) = console::process_info(pid)?;
+    is_claude(&exe).then_some(Target { pid, started })
+}
+
+#[cfg(not(windows))]
+fn claimed_target(_pid: u32) -> Option<Target> {
+    None
+}
+
+/// The relay's ancestors by executable name, for the log.
+#[cfg(windows)]
+fn chain(relay_pid: u32) -> String {
+    let names: Vec<String> = crate::platform::process_ancestors(relay_pid)
+        .into_iter()
+        .map(|pid| match console::process_info(pid) {
+            Some((exe, _)) => exe.rsplit(['\\', '/']).next().unwrap_or_default().to_string(),
+            None => format!("{pid}?"),
+        })
+        .collect();
+    names.join(" < ")
+}
+
+#[cfg(not(windows))]
+fn chain(_relay_pid: u32) -> String {
+    String::new()
 }
 
 /// Claude Code's own executable, or the Node.js an npm install runs it on.
@@ -122,7 +158,9 @@ pub fn send(session: &str, text: &str, images: &[String]) -> Result<(), String> 
         list.iter().find(|(s, _)| s == session).and_then(|(_, t)| *t)
     };
     let Some(target) = target else {
-        return Err("This session doesn't run in a terminal Coucou can type into.".into());
+        let short: String = session.chars().take(8).collect();
+        crate::log::line(format!("send: no console known for session {short}"));
+        return Err("Coucou hasn't found this session's terminal yet. Send one message in the terminal, then try again.".into());
     };
     send_to(target, &message)
 }
@@ -135,7 +173,11 @@ fn send_to(target: Target, message: &str) -> Result<(), String> {
         _ => return Err("This Claude Code session has ended.".into()),
     }
     let _one = SENDING.lock().unwrap_or_else(|e| e.into_inner());
-    console::type_line(target.pid, message)
+    let sent = console::type_line(target.pid, message);
+    if let Err(e) = &sent {
+        crate::log::line(format!("send: typing into process {} failed: {e}", target.pid));
+    }
+    sent
 }
 
 #[cfg(not(windows))]

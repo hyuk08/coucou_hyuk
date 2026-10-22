@@ -9,6 +9,7 @@ import {
   ROUNDED_CORNER, VIEW_LAYOUTS, botGlowColor, botGlowOpacity, botPosition, chatPromptHeight,
   islandSize,
   QUESTION_PICKER_H,
+  setSendHeight,
   type BotEmoteName, type IslandMode, type IslandViewName,
 } from "../core/layout";
 import { Sound } from "../core/sound";
@@ -99,7 +100,8 @@ export class Island {
 
   private confusedRecovery: number | null = null;
   private prevViewBeforeConfused: IslandViewName = "overview";
-  private lastSyncedView: IslandViewName | null = null;
+  /** The view with a text field that has the keyboard, while the island is open. */
+  private keyboardView: IslandViewName | null = null;
 
   /** The launch greeting ended, or the island came out of hidden — two of the
    *  moments the Monday recap may open (see src/recap/recap.ts). */
@@ -737,6 +739,16 @@ export class Island {
   // ── Input ───────────────────────────────────────────────────────────────────
 
   private wireInput() {
+    // The send view fills the window, whose height is half the screen's; the
+    // wake strip (a few px) is not a size to follow.
+    const fitSend = () => {
+      if (window.innerHeight < 300) return;
+      setSendHeight(window.innerHeight);
+      if (State.mode === "expanded" && State.view === "send") this.animateGeometry(false);
+    };
+    window.addEventListener("resize", fitSend);
+    fitSend();
+
     // The wake strip is the only thing the OS can hit while the island is hidden.
     this.wakeStrip.addEventListener("mouseenter", () => {
       Sound.resume();
@@ -1186,17 +1198,18 @@ export class Island {
       if (on) view.sync();
     }
 
-    // The chat is the only view with a text field, so it is the only time the
-    // island is allowed to take keyboard focus.
-    if (this.lastSyncedView !== State.view) {
-      const typing = (v: string | null) => v === "prompt" || v === "send";
-      const wasChat = typing(this.lastSyncedView);
-      this.lastSyncedView = State.view;
-      if (typing(State.view)) {
+    // The views with a text field (the chat, Send to Claude Code) are the only
+    // time the island may take keyboard focus, and only while it is open: once
+    // it folds (Escape) the keys go back to the app underneath.
+    const typing = State.mode === "expanded" && (State.view === "prompt" || State.view === "send");
+    const keyboardView = typing ? State.view : null;
+    if (this.keyboardView !== keyboardView) {
+      const had = this.keyboardView != null;
+      this.keyboardView = keyboardView;
+      if (keyboardView) {
         void Bridge.focusWindow(true);
-        const view = State.view;
-        window.setTimeout(() => this.views.get(view)?.focus?.(), 120);
-      } else if (wasChat) {
+        window.setTimeout(() => this.views.get(keyboardView)?.focus?.(), 120);
+      } else if (had) {
         void Bridge.focusWindow(false);
       }
     }

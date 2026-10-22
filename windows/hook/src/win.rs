@@ -12,6 +12,9 @@ use windows::core::PWSTR;
 use windows::Win32::Foundation::{CloseHandle, HANDLE, LocalFree, HLOCAL};
 use windows::Win32::Security::Authorization::ConvertSidToStringSidW;
 use windows::Win32::Security::{GetTokenInformation, TokenUser, TOKEN_QUERY, TOKEN_USER};
+use windows::Win32::System::Diagnostics::ToolHelp::{
+    CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
+};
 use windows::Win32::System::Pipes::GetNamedPipeServerProcessId;
 use windows::Win32::System::Threading::{
     GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
@@ -113,4 +116,32 @@ unsafe fn token_sid(process: HANDLE) -> Option<String> {
     let sid = text.to_string().ok();
     let _ = LocalFree(Some(HLOCAL(text.0 as *mut _)));
     sid
+}
+
+/// The nearest claude.exe (or node.exe running Claude Code) above this relay.
+/// The relay is gone by the time the app could look for it, so it says which
+/// process it was started by; the app checks it before typing into its console.
+pub fn claude_process() -> Option<u32> {
+    let mut table = std::collections::HashMap::new();
+    unsafe {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0).ok()?;
+        let mut entry = PROCESSENTRY32W { dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32, ..Default::default() };
+        let mut more = Process32FirstW(snapshot, &mut entry).is_ok();
+        while more {
+            let len = entry.szExeFile.iter().position(|c| *c == 0).unwrap_or(entry.szExeFile.len());
+            table.insert(entry.th32ProcessID, (entry.th32ParentProcessID, String::from_utf16_lossy(&entry.szExeFile[..len])));
+            more = Process32NextW(snapshot, &mut entry).is_ok();
+        }
+        let _ = CloseHandle(snapshot);
+    }
+    let mut pid = std::process::id();
+    for _ in 0..16 {
+        let (parent, _) = table.get(&pid)?;
+        pid = *parent;
+        let (_, exe) = table.get(&pid)?;
+        if exe.eq_ignore_ascii_case("claude.exe") || exe.eq_ignore_ascii_case("node.exe") {
+            return Some(pid);
+        }
+    }
+    None
 }

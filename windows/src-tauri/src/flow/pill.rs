@@ -24,6 +24,8 @@ const BOTTOM: (f64, f64) = (520.0, 170.0);
 const SIDE: (f64, f64) = (480.0, 320.0);
 /// Off-screen spot on Windows while hidden: the webview keeps running, ready.
 const PARKED: (i32, i32) = (-32000, -32000);
+/// Off in this build: the pill is never shown (see `update`).
+const SHOW_PILL: bool = false;
 
 /// What the pill shows, sent whole to the page on every change.
 #[derive(Debug, Clone, Serialize, PartialEq, Default)]
@@ -182,7 +184,10 @@ pub fn update(app: &AppHandle, change: impl FnOnce(&mut PillState)) {
         (s.clone(), s.edge != edge_before)
     };
     let _ = app.emit_to(LABEL, "pill-state", &state);
-    let visible = state.enabled || state.note_started_at.is_some() || state.announcement.is_some() || state.voice.is_some() || state.phase != "idle";
+    // This build never brings the pill on screen: it stays parked out of
+    // sight. Dictation, calls and « OK Coucou » work the same without it.
+    let visible = SHOW_PILL
+        && (state.enabled || state.note_started_at.is_some() || state.announcement.is_some() || state.voice.is_some() || state.phase != "idle");
     let was = pill.shown.swap(visible, Ordering::Relaxed);
     if visible && (!was || edge_changed) {
         place(app, &pill, &state.edge, state.phase == "listening");

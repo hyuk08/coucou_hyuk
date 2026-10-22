@@ -186,6 +186,10 @@ fn prepare(raw: &[u8], args: &Args, env: &dyn Fn(&str) -> Option<String>, cwd: &
     }
 
     add_terminal_context(map, env);
+    #[cfg(windows)]
+    if let Some(pid) = win::claude_process() {
+        map.insert("coucou_claude_pid".into(), Value::from(pid));
+    }
 
     // Kept whole: what goes back to Claude Code must be its own input, not the
     // shortened copy the island is shown.

@@ -105,6 +105,14 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
 // dropped the whole sequence — Mochi included — is drawn by src/upload, which
 // owns its own constants (USC) straight from UploadSequenceEngine.swift.
 
+/**
+ * Send to Claude Code takes the whole window, which is half the screen high
+ * (island.rs): set from the window's height, never below its 300 px.
+ */
+export function setSendHeight(windowHeight: number) {
+  VIEW_LAYOUTS.send.height = Math.max(300, Math.floor(windowHeight) - 8);
+}
+
 /** The question view with options to pick from: room for two rows of them. */
 export const QUESTION_PICKER_H = 200;
 

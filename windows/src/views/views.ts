@@ -201,7 +201,14 @@ function buildOverview(actions: ViewActions): ViewHost {
   );
   const left = card(null, leftBody, jump);
   const pills = h("div", { class: "pills" });
-  const right = card(null, pills);
+  // The big way in to Send to Claude Code, with the other pills in a column beside it.
+  const talk = h(
+    "button",
+    { class: "talk-btn", onclick: () => { actions.blip(); actions.setView("send"); } },
+    svg(ICONS.terminal, 22, { evenOdd: true }),
+    h("span", { text: tl("Talk to Claude Code") }),
+  );
+  const right = card(null, h("div", { class: "right-body" }, talk, pills));
   // Opened from a plan pill in the header: stands in for the left card.
   const plan = new PlanCard();
   let planTimer: number | null = null;
@@ -436,7 +443,7 @@ export function hasSessionTicker(task: AgentTask): boolean {
 
 function buildPill(task: AgentTask, actions: ViewActions): HTMLElement {
   const label = task.id === "integration_claude" ? pillDefinition(task.id)!.name : task.name;
-  const canvas = createMiniBot(task, 24);
+  const canvas = createMiniBot(task, 16);
   const pill = h(
     "div",
     { class: "pill", onclick: () => actions.setFocus(task.id) },

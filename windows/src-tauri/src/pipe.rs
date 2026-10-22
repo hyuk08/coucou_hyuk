@@ -262,8 +262,9 @@ fn note_session_window(pipe: &impl Relay, payload: &Value, event: &str) {
         crate::session_input::forget(session);
         return;
     }
+    let claimed = payload.get("coucou_claude_pid").and_then(Value::as_u64).and_then(|p| u32::try_from(p).ok());
     if let Some(relay) = pipe.client_pid() {
-        crate::session_input::note(session, relay);
+        crate::session_input::note(session, relay, claimed);
     }
     if session_window::known(session) {
         return;
