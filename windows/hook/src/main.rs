@@ -178,6 +178,11 @@ fn prepare(raw: &[u8], args: &Args, env: &dyn Fn(&str) -> Option<String>, cwd: &
     map.insert("hook_event_name".into(), Value::String(name.clone()));
 
     for field in DROPPED_FIELDS {
+        // Stop keeps its transcript's path: the island reads the turn's
+        // messages from it (Send to Claude Code). Only the path, never the file.
+        if *field == "transcript_path" && name == "Stop" {
+            continue;
+        }
         map.remove(*field);
     }
 

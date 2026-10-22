@@ -415,6 +415,9 @@ fn current_screen_key(app: &AppHandle) -> Option<(i32, i32, u32, u32, u64)> {
 pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
     std::thread::spawn(move || {
         let mut was_down = false;
+        // The button went down over the panel's empty part, i.e. on the window
+        // underneath: that drag (moving a window, selecting text) is not ours.
+        let mut pressed_beneath = false;
         // Remembered across wakes so a display change while hidden is noticed the
         // moment the island comes back.
         let mut last_screen: Option<(i32, i32, u32, u32, u64)> = None;
@@ -471,6 +474,10 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                 let down = left_button_down();
                 let pressed = down && !was_down;
                 was_down = down;
+                let in_panel = x >= 0.0 && x <= size.0 && y >= 0.0 && y <= size.1;
+                if pressed {
+                    pressed_beneath = in_panel && !on_island;
+                }
                 // A press anywhere but on the island folds it when it is open,
                 // like Escape (the page decides; it ignores this otherwise).
                 if pressed && !on_island {
@@ -496,11 +503,10 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                 }
                 last = (x, y);
 
-                let dragging = down
-                    && x >= 0.0
-                    && x <= size.0
-                    && y >= 0.0
-                    && y <= size.1;
+                // A drag that started elsewhere (a file from Explorer) may land
+                // anywhere on the panel; one that started on the window under
+                // the panel's empty part is left to that window.
+                let dragging = down && in_panel && !pressed_beneath;
 
                 let accept = on_island || dragging;
                 if gate.ignoring.load(Ordering::Relaxed) == accept {

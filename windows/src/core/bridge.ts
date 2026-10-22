@@ -341,9 +341,10 @@ export const Bridge = {
   /** Types the text (and the images' paths) into the session's terminal, then Enter. */
   sendToSession: (sessionId: string, text: string, images: string[]) =>
     callOrThrow<void>("send_to_session", { sessionId, text, images }),
-  /** A pasted image as a path: the screenshot Windows just saved, else a copy in the inbox. */
-  pasteImage: (bytes: number[], width: number, height: number) =>
-    callOrThrow<string>("paste_image", { bytes, width, height }),
+  /** Every message Claude wrote in the session's last turn, from its transcript. */
+  sessionTurn: (transcriptPath: string) => call<string[]>("session_turn", { transcriptPath }),
+  /** A pasted image as a path: written to the inbox as pasted, swept after a week. */
+  pasteImage: (bytes: number[]) => callOrThrow<string>("paste_image", { bytes }),
   /**
    * The models a provider offers, for the picker in the chat view. Rust asks
    * the provider only when it has a key (or a server address).

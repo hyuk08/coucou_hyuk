@@ -114,7 +114,7 @@ pub fn ingest(source: &str) -> Result<DroppedFile, String> {
 /// Drops anything copied here more than a week ago. `ingest` stamps every copy
 /// with the time it landed, so this really is the age of the copy and not the
 /// age of whatever the user happened to drag in.
-fn sweep(dir: &Path) {
+pub fn sweep(dir: &Path) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };
     let now = SystemTime::now();
     for entry in entries.flatten() {

@@ -345,17 +345,28 @@ async fn send_to_session(session_id: String, text: String, images: Vec<String>) 
         .map_err(|e| e.to_string())?
 }
 
-/// An image pasted in the island, as a path Claude Code can open: the
-/// screenshot Windows just saved when it is that one, else a copy in the inbox.
+/// Every message Claude wrote in the session's last turn, read from its
+/// transcript (Send to Claude Code shows them all, not only the last one).
 #[tauri::command]
-async fn paste_image(bytes: Vec<u8>, width: u32, height: u32) -> Result<String, String> {
+async fn session_turn(transcript_path: String) -> Vec<String> {
+    let path = std::path::PathBuf::from(transcript_path);
+    if !session_input::is_transcript(&path, &platform::home_dir()) {
+        return Vec::new();
+    }
+    tauri::async_runtime::spawn_blocking(move || session_input::turn_messages(&path))
+        .await
+        .unwrap_or_default()
+}
+
+/// An image pasted in the island, as a path Claude Code can open: written to
+/// the inbox as pasted (with whatever was drawn on it), swept after a week.
+#[tauri::command]
+async fn paste_image(bytes: Vec<u8>) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        if let Some(dir) = platform::screenshots_dir() {
-            if let Some(path) = session_input::recent_screenshot(&dir, width, height) {
-                return Ok(path.to_string_lossy().into_owned());
-            }
-        }
-        session_input::save_image(&files::inbox_dir(), &bytes).map(|p| p.to_string_lossy().into_owned())
+        let dir = files::inbox_dir();
+        let saved = session_input::save_image(&dir, &bytes).map(|p| p.to_string_lossy().into_owned());
+        files::sweep(&dir);
+        saved
     })
     .await
     .map_err(|e| e.to_string())?
@@ -839,6 +850,7 @@ pub fn run() {
             focus_window,
             send_to_session,
             paste_image,
+            session_turn,
             reposition,
             fit_zoom,
             hub_shown,

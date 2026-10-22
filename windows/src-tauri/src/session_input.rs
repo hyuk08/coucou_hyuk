@@ -9,8 +9,8 @@
 // forward and nothing is pasted anywhere else: only that console gets the keys,
 // so an editor that happens to have the focus can never receive them.
 //
-// Pasted images ride along as file paths: a screenshot Windows has just saved
-// is sent where it is, any other image is first written to the inbox.
+// Pasted images ride along as file paths: each is written to the inbox as it
+// was pasted (a screenshot with what was drawn on it), and swept after a week.
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -185,6 +185,78 @@ fn send_to(_target: Target, _message: &str) -> Result<(), String> {
     Err("Sending to Claude Code is only on Windows for now.".into())
 }
 
+// ── The turn's messages ──────────────────────────────────────────────────────
+
+/// The most read from the end of a transcript to find the turn's start.
+const MAX_TAIL: u64 = 32 * 1024 * 1024;
+const MAX_MESSAGES: usize = 30;
+
+/// A Claude Code transcript, and nothing else: a .jsonl under ~/.claude/projects.
+pub fn is_transcript(path: &Path, home: &Path) -> bool {
+    let root = home.join(".claude").join("projects");
+    path.extension().is_some_and(|x| x == "jsonl")
+        && path.components().all(|c| !matches!(c, std::path::Component::ParentDir))
+        && path.starts_with(&root)
+}
+
+/// Every text Claude wrote in the last turn, in order — what it said between
+/// its tool calls as well as its final answer. The turn starts at the last
+/// prompt: a user entry with text rather than tool results.
+pub fn turn_messages(path: &Path) -> Vec<String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let Ok(mut file) = std::fs::File::open(path) else { return Vec::new() };
+    let size = file.metadata().map(|m| m.len()).unwrap_or(0);
+    let mut tail = 1024 * 1024u64;
+    loop {
+        let start = size.saturating_sub(tail);
+        let mut buf = Vec::new();
+        if file.seek(SeekFrom::Start(start)).is_err() || file.read_to_end(&mut buf).is_err() {
+            return Vec::new();
+        }
+        let text = String::from_utf8_lossy(&buf);
+        // A tail that starts mid-line drops that first, partial line.
+        let lines: Vec<&str> = if start == 0 { text.lines().collect() } else { text.lines().skip(1).collect() };
+        let (messages, found) = messages_since_prompt(&lines);
+        if found || start == 0 || tail >= MAX_TAIL {
+            return messages;
+        }
+        tail *= 4;
+    }
+}
+
+fn messages_since_prompt(lines: &[&str]) -> (Vec<String>, bool) {
+    let mut out: Vec<String> = Vec::new();
+    for line in lines.iter().rev() {
+        let Ok(entry) = serde_json::from_str::<serde_json::Value>(line) else { continue };
+        let content = &entry["message"]["content"];
+        match entry["type"].as_str() {
+            Some("assistant") => {
+                for block in content.as_array().into_iter().flatten().rev() {
+                    if block["type"] == "text" {
+                        let t = block["text"].as_str().unwrap_or_default().trim();
+                        if !t.is_empty() && out.last().map(String::as_str) != Some(t) {
+                            out.push(t.to_string());
+                        }
+                    }
+                }
+            }
+            Some("user") => {
+                let prompt = content.is_string()
+                    || content.as_array().is_some_and(|blocks| blocks.iter().all(|b| b["type"] != "tool_result"));
+                if prompt {
+                    out.reverse();
+                    out.truncate(MAX_MESSAGES);
+                    return (out, true);
+                }
+            }
+            _ => {}
+        }
+    }
+    out.reverse();
+    out.truncate(MAX_MESSAGES);
+    (out, false)
+}
+
 // ── Pasted images ────────────────────────────────────────────────────────────
 
 /// Width and height from a PNG's header, without decoding it.
@@ -197,26 +269,7 @@ pub fn png_size(head: &[u8]) -> Option<(u32, u32)> {
     Some((w, h))
 }
 
-/// A screenshot Windows saved in the last few minutes with these dimensions:
-/// the image just pasted, already on disk.
-pub fn recent_screenshot(dir: &Path, width: u32, height: u32) -> Option<PathBuf> {
-    use std::io::Read;
-    let now = std::time::SystemTime::now();
-    let mut files: Vec<(std::time::SystemTime, PathBuf)> = std::fs::read_dir(dir)
-        .ok()?
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().is_some_and(|x| x.eq_ignore_ascii_case("png")))
-        .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.path())))
-        .filter(|(m, _)| now.duration_since(*m).map_or(true, |age| age.as_secs() <= 300))
-        .collect();
-    files.sort_by(|a, b| b.0.cmp(&a.0));
-    files.into_iter().take(5).map(|(_, p)| p).find(|p| {
-        let mut head = [0u8; 24];
-        std::fs::File::open(p).and_then(|mut f| f.read_exact(&mut head)).is_ok() && png_size(&head) == Some((width, height))
-    })
-}
-
-/// Any other pasted image: written to the inbox, named by the time.
+/// A pasted image, written to the inbox as it was pasted, named by the time.
 pub fn save_image(dir: &Path, bytes: &[u8]) -> Result<PathBuf, String> {
     if bytes.is_empty() || bytes.len() > MAX_IMAGE_BYTES {
         return Err("The image is too large.".into());
@@ -268,6 +321,33 @@ mod tests {
     }
 
     #[test]
+    fn the_turn_is_every_text_since_the_last_prompt() {
+        let lines = [
+            r#"{"type":"user","message":{"role":"user","content":"earlier question"}}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"old answer"}]}}"#,
+            r#"{"type":"user","message":{"role":"user","content":"how much CPU?"}}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"..."}]}}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"Let me measure."}]}}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash"}]}}"#,
+            r#"{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"1%"}]}}"#,
+            r#"{"type":"attachment"}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"Almost nothing."}]}}"#,
+        ];
+        let (messages, found) = messages_since_prompt(&lines);
+        assert!(found);
+        assert_eq!(messages, vec!["Let me measure.", "Almost nothing."]);
+    }
+
+    #[test]
+    fn only_claude_code_transcripts_are_read() {
+        let home = Path::new(r"C:\Users\a");
+        assert!(is_transcript(Path::new(r"C:\Users\a\.claude\projects\p\s.jsonl"), home));
+        assert!(!is_transcript(Path::new(r"C:\Users\a\.claude\projects\..\..\secret.jsonl"), home));
+        assert!(!is_transcript(Path::new(r"C:\Users\a\.claude\projects\p\s.txt"), home));
+        assert!(!is_transcript(Path::new(r"C:\Users\a\Documents\s.jsonl"), home));
+    }
+
+    #[test]
     fn png_dimensions_come_from_the_header() {
         let mut head = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
         head.extend_from_slice(&1920u32.to_be_bytes());
@@ -277,17 +357,14 @@ mod tests {
     }
 
     #[test]
-    fn a_recent_screenshot_of_the_same_size_is_found() {
-        let dir = std::env::temp_dir().join(format!("coucou-shots-{}", std::process::id()));
-        let _ = std::fs::create_dir_all(&dir);
+    fn a_pasted_image_is_saved_as_png_or_jpeg_only() {
+        let dir = std::env::temp_dir().join(format!("coucou-paste-{}", std::process::id()));
         let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
         png.extend_from_slice(&800u32.to_be_bytes());
         png.extend_from_slice(&600u32.to_be_bytes());
-        std::fs::write(dir.join("shot.png"), &png).unwrap();
-        assert_eq!(recent_screenshot(&dir, 800, 600), Some(dir.join("shot.png")));
-        assert_eq!(recent_screenshot(&dir, 801, 600), None);
         let saved = save_image(&dir, &png).unwrap();
         assert!(saved.extension().is_some_and(|x| x == "png"));
+        assert_eq!(std::fs::read(&saved).unwrap(), png);
         assert!(save_image(&dir, b"not an image").is_err());
         let _ = std::fs::remove_dir_all(&dir);
     }

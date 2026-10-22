@@ -32,6 +32,8 @@ export interface SessionHook {
   cwd?: string;
   prompt?: string;
   last_assistant_message?: string;
+  /** Stop only: where the turn's messages are, all of them (session_turn). */
+  transcript_path?: string;
   coucou_agent?: string;
 }
 
@@ -88,9 +90,24 @@ export function observeSessionHook(p: SessionHook) {
   if (p.hook_event_name === "UserPromptSubmit" && p.prompt && !/^\s*<[a-z-]+[\s>]/.test(p.prompt)) {
     s.turns.push({ role: "user", text: p.prompt });
   } else if (p.hook_event_name === "Stop") {
-    if (p.last_assistant_message) s.turns.push({ role: "assistant", text: p.last_assistant_message });
+    // The final answer at once, then everything Claude said during the turn
+    // in its place once the transcript is read.
+    const final: Turn | null = p.last_assistant_message ? { role: "assistant", text: p.last_assistant_message } : null;
+    if (final) s.turns.push(final);
     if (awaiting === id) awaiting = null;
+    if (p.transcript_path) void fillTurn(s, final, p.transcript_path);
   }
+  s.turns.splice(0, Math.max(0, s.turns.length - MAX_TURNS));
+  onChange?.();
+}
+
+/** Replaces the turn's final answer with all of the turn's messages. */
+async function fillTurn(s: Session, final: Turn | null, transcript: string) {
+  const messages = await Bridge.sessionTurn(transcript);
+  if (!messages || messages.length < 2) return;
+  const at = final ? s.turns.lastIndexOf(final) : s.turns.length;
+  if (at < 0) return;
+  s.turns.splice(at, final ? 1 : 0, ...messages.map((text): Turn => ({ role: "assistant", text })));
   s.turns.splice(0, Math.max(0, s.turns.length - MAX_TURNS));
   onChange?.();
 }
@@ -112,14 +129,6 @@ function target(): Session | null {
 interface Attached {
   path: string;
   url: string;
-}
-
-function readSize(blob: Blob): Promise<{ w: number; h: number }> {
-  return createImageBitmap(blob).then((b) => {
-    const size = { w: b.width, h: b.height };
-    b.close();
-    return size;
-  });
 }
 
 export function buildSend(hold: (on: boolean) => void): ViewHost {
@@ -184,9 +193,8 @@ export function buildSend(hold: (on: boolean) => void): ViewHost {
       if (!blob) continue;
       void (async () => {
         try {
-          const { w, h: ht } = await readSize(blob);
           const bytes = Array.from(new Uint8Array(await blob.arrayBuffer()));
-          const path = await Bridge.pasteImage(bytes, w, ht);
+          const path = await Bridge.pasteImage(bytes);
           images.push({ path, url: URL.createObjectURL(blob) });
           drawThumbs();
         } catch {
@@ -259,7 +267,7 @@ export function buildSend(hold: (on: boolean) => void): ViewHost {
       status.textContent = s ? note : note || t(STRINGS.noSession);
 
       const waiting = !!s && awaiting === s.id;
-      const key = `${s?.id ?? ""}:${s?.turns.length ?? 0}:${s?.turns.at(-1)?.text.length ?? 0}:${waiting}`;
+      const key = `${s?.id ?? ""}:${s?.turns.length ?? 0}:${s?.turns.reduce((n, t) => n + t.text.length, 0) ?? 0}:${waiting}`;
       if (key !== renderedKey) {
         renderedKey = key;
         clear(log);

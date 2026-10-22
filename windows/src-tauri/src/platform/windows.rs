@@ -61,18 +61,6 @@ pub fn config_dir() -> PathBuf {
 }
 
 /// %LOCALAPPDATA%\Coucou — where coucou-hook.exe, the inbox and the log live.
-/// Where Windows saves screenshots (Win+Shift+S, Print Screen), if it says.
-pub fn screenshots_dir() -> Option<PathBuf> {
-    use ::windows::Win32::System::Com::CoTaskMemFree;
-    use ::windows::Win32::UI::Shell::{SHGetKnownFolderPath, FOLDERID_Screenshots, KNOWN_FOLDER_FLAG};
-    unsafe {
-        let raw = SHGetKnownFolderPath(&FOLDERID_Screenshots, KNOWN_FOLDER_FLAG(0), None).ok()?;
-        let path = raw.to_string().ok().map(PathBuf::from);
-        CoTaskMemFree(Some(raw.0 as *const _));
-        path
-    }
-}
-
 pub fn local_dir() -> PathBuf {
     let base = std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
