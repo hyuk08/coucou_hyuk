@@ -184,10 +184,16 @@ pub fn update(app: &AppHandle, change: impl FnOnce(&mut PillState)) {
         (s.clone(), s.edge != edge_before)
     };
     let _ = app.emit_to(LABEL, "pill-state", &state);
-    // This build never brings the pill on screen: it stays parked out of
-    // sight. Dictation, calls and « OK Coucou » work the same without it.
-    let visible = SHOW_PILL
-        && (state.enabled || state.note_started_at.is_some() || state.announcement.is_some() || state.voice.is_some() || state.phase != "idle");
+    // This build never shows the pill: its window is hidden outright, since a
+    // window never shown is never parked either. Dictation, calls and
+    // « OK Coucou » work the same without it.
+    if !SHOW_PILL {
+        if let Some(win) = window(app) {
+            let _ = win.hide();
+        }
+        return;
+    }
+    let visible = state.enabled || state.note_started_at.is_some() || state.announcement.is_some() || state.voice.is_some() || state.phase != "idle";
     let was = pill.shown.swap(visible, Ordering::Relaxed);
     if visible && (!was || edge_changed) {
         place(app, &pill, &state.edge, state.phase == "listening");
